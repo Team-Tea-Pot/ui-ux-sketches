@@ -1,0 +1,81 @@
+---
+name: Validate PR Files
+
+'on':
+  pull_request:
+    branches:
+      - development
+      - dev
+
+jobs:
+  validate-files:
+    runs-on: ubuntu-latest
+    name: Check for required sketch and diagram files
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v39
+        with:
+          files: |
+            features/**/*.excalidraw
+            features/**/*.drawio
+
+      - name: Validate required files
+        run: |
+          echo "Changed files:"
+          echo "${{ steps.changed-files.outputs.all_changed_files }}"
+
+          # Get all changed files
+          changed_files="${{ steps.changed-files.outputs.all_changed_files }}"
+
+          if [ -z "$changed_files" ]; then
+            echo "❌ ERROR: No sketch or diagram files found!"
+            echo "Please add both:"
+            echo "  1. An Excalidraw sketch file (*.excalidraw)"
+            echo "  2. A diagram file (*.excalidraw or *.drawio)"
+            exit 1
+          fi
+
+          # Count sketch and diagram files
+          sketch_count=0
+          diagram_count=0
+
+          for file in $changed_files; do
+            filename=$(basename "$file")
+            if [[ "$filename" == *"-sketch.excalidraw" ]]; then
+              sketch_count=$((sketch_count + 1))
+              echo "✓ Found sketch file: $file"
+            elif [[ "$filename" == *"-diagram.excalidraw" ]] \
+              || [[ "$filename" == *"-diagram.drawio" ]]; then
+              diagram_count=$((diagram_count + 1))
+              echo "✓ Found diagram file: $file"
+            fi
+          done
+
+          echo ""
+          echo "Summary:"
+          echo "  Sketch files: $sketch_count"
+          echo "  Diagram files: $diagram_count"
+
+          if [ $sketch_count -eq 0 ] || [ $diagram_count -eq 0 ]; then
+            echo ""
+            echo "❌ ERROR: PR must include BOTH files!"
+            echo ""
+            echo "Required files:"
+            echo "  1. A sketch file ending with"
+            echo "     '-sketch.excalidraw'"
+            echo "  2. A diagram file ending with"
+            echo "     '-diagram.excalidraw' or '-diagram.drawio'"
+            echo ""
+            echo "Please add the missing file(s) to features/"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ SUCCESS: PR contains both required files!"
